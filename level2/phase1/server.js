@@ -1,14 +1,12 @@
 const express = require("express");
-
+const ratelimiter = require("./middleware/ratelimit");
+const redis = require("./redis");
+const emailQueue = require("./queue");
 
 const dotenv = require("dotenv");
 dotenv.config();
 
-const Redis = require("ioredis");
 
-
-const redis = new Redis(process.env.REDIS_URL);
-module.exports = redis;
 
 const connectDB = require("./db");
 const userModel = require("./models/usermodel");
@@ -18,7 +16,7 @@ app.use(express.json());
 
 connectDB();
 
-app.get("/api/fetch", async (req, res) => {
+app.get("/api/fetch", ratelimiter, async (req, res) => {
   try {
     const users = await userModel.find();
     res.status(200).json(users);
@@ -83,7 +81,12 @@ app.post("/api/create", async (req, res) => {
   try {
     const { name, email, password } = req.body;
     await redis.del("users:all"); // Invalidate the cache when a new user is created
-    const user = await userModel.create({ name, email, password });
+    const user = await userModel.create({ name, email, password }); 
+
+     await emailQueue.add("sendEmail", {email}); // Add a job to the email queue to send an email to the user
+
+
+    
     res.status(201).json(user);
   } catch (error) {
     res.status(500).json({ message: "Error creating user", error: error.message });

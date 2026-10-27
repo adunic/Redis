@@ -14,4 +14,6 @@ const ratelimiter = async (req, res, next) => {
         return res.status(429).json({ message: "Too many requests, please try again later." });
     }
     next();
-}
+} 
+
+module.exports = ratelimiter;
